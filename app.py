@@ -11,7 +11,8 @@ load_dotenv()
 
 app = Flask(__name__)
 
-
+# Get secret key from environment variable or generate a random one
+app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 # Add Markdown filter to Jinja2
 app.jinja_env.filters['markdown'] = lambda text: markdown.markdown(text, extensions=['extra', 'codehilite'])
 
