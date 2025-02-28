@@ -76,63 +76,82 @@ class OpenAIClient:
     @staticmethod
     def generate_solution(problem_data, language):
         """
-        Generate a solution for a problem using OpenAI
+        Generate a solution for a programming problem using OpenAI
         
         Args:
-            problem_data (dict): Problem details
-            language (str): Programming language for the solution
+            problem_data (dict): Problem data including title, description, etc.
+            language (str): Programming language to generate solution in
             
         Returns:
             dict: Generated solution data or None if there was an error
         """
         try:
-            # Create a prompt for OpenAI
-            prompt = OpenAIClient._create_prompt(problem_data, language)
-            
             # Get API key from environment
             api_key = os.getenv('OPENAI_API_KEY')
+            print(f"API Key available: {api_key is not None}")
+            
             if not api_key:
+                print("ERROR: OpenAI API key not found in environment variables")
                 return None
             
-            # Create a clean OpenAI client instance
-            client = OpenAI()
-            client.api_key = api_key
-            
             # Load system prompt from prompts.txt file
-            system_prompt = ""
             try:
-                with open('prompts.txt', 'r') as file:
-                    system_prompt = file.read().strip()
-            except Exception:
-                # Fallback to default system prompt
-                system_prompt = "You are an expert competitive programmer who provides clear explanations and efficient solutions to programming problems. Format your entire response in Markdown."
+                # Try with absolute path
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                prompts_path = os.path.join(current_dir, 'prompts.txt')
+                print(f"Attempting to load prompts from: {prompts_path}")
+                
+                with open(prompts_path, 'r') as file:
+                    system_prompt = file.read()
+                print("Successfully loaded system prompt")
+            except Exception as e:
+                print(f"Error loading system prompt: {str(e)}")
+                # Fallback system prompt
+                system_prompt = "You are an expert in programming problem-solving and expert in explain the programming question."
+                print("Using fallback system prompt")
             
-            # Call OpenAI API
-            response = client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=4000
-            )
+            # Create prompt for OpenAI
+            user_prompt = OpenAIClient._create_prompt(problem_data, language)
+            print(f"Created user prompt with length: {len(user_prompt)}")
             
-            # Process the response
-            solution_text = response.choices[0].message.content
+            # Initialize OpenAI client
+            try:
+                print("Initializing OpenAI client...")
+                client = OpenAI(api_key=api_key)
+                print("Successfully initialized OpenAI client")
+            except Exception as e:
+                print(f"Error initializing OpenAI client: {str(e)}")
+                traceback.print_exc()
+                return None
             
-            # For markdown format, we just return the entire content
-            if problem_data.get('markdown_format', False):
-                return {
-                    'solution_content': solution_text
-                }
+            # Generate solution using OpenAI
+            try:
+                print(f"Making API request to OpenAI with model: gpt-3.5-turbo")
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=2500
+                )
+                print("Successfully received response from OpenAI")
+            except Exception as e:
+                print(f"Error during OpenAI API call: {str(e)}")
+                traceback.print_exc()
+                return None
             
-            # Otherwise, parse the solution text to extract explanation, code, and complexity
-            solution_data = OpenAIClient._parse_solution(solution_text, language)
+            # Extract solution content from response
+            solution_content = response.choices[0].message.content
+            print(f"Extracted solution content with length: {len(solution_content)}")
             
-            return solution_data
+            return {
+                'solution_content': solution_content
+            }
             
         except Exception as e:
+            print(f"Unexpected error in generate_solution: {str(e)}")
             traceback.print_exc()
             return None
     
